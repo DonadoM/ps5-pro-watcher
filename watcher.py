@@ -107,7 +107,11 @@ def run_once(config, state, first_run):
             logging.exception("%s fallo: %s", store_name, e)
             continue
         per_store_counts[store_name] = len(offers)
-        logging.info("%s: %d ofertas encontradas", store_name, len(offers))
+        in_stock_n = sum(1 for o in offers if o.get("in_stock", True))
+        logging.info(
+            "%s: %d oferta(s), %d con stock",
+            store_name, len(offers), in_stock_n,
+        )
         for offer in offers:
             key = f"{store_name}::{offer['id']}"
             current[key] = {
@@ -115,20 +119,28 @@ def run_once(config, state, first_run):
                 "title": offer["title"],
                 "price": offer["price"],
                 "url": offer["url"],
+                "in_stock": bool(offer.get("in_stock", True)),
             }
 
     threshold = int(config.get("threshold_cop", 0) or 0)
     token = config["telegram_bot_token"]
     chat_id = config["telegram_chat_id"]
 
+    def stock_tag(o):
+        return "" if o.get("in_stock", True) else "  [AGOTADO]"
+
     if first_run:
         # Resumen inicial
         if current:
             lines = ["*PS5 Pro - watcher iniciado*", ""]
-            ordered = sorted(current.values(), key=lambda x: x["price"])
+            # Ordenar: primero los con stock, dentro de cada grupo por precio
+            ordered = sorted(
+                current.values(),
+                key=lambda x: (not x.get("in_stock", True), x["price"]),
+            )
             for o in ordered:
                 lines.append(
-                    f"- {o['store']}: {format_cop(o['price'])}\n"
+                    f"- {o['store']}: {format_cop(o['price'])}{stock_tag(o)}\n"
                     f"  {escape_md(o['title'][:70])}\n"
                     f"  {o['url']}"
                 )
@@ -143,16 +155,26 @@ def run_once(config, state, first_run):
                 "Seguire intentando.",
             )
     else:
-        # Alertas por cambio o umbral
+        # Alertas por cambio de precio, cambio de stock o umbral
         for key, offer in current.items():
             prev = state.get(key)
-            below = threshold > 0 and offer["price"] <= threshold
-            changed = (prev is None) or (prev.get("price") != offer["price"])
-            if not (changed or below):
+            now_in = offer.get("in_stock", True)
+            below = threshold > 0 and offer["price"] <= threshold and now_in
+            price_changed = (prev is None) or (prev.get("price") != offer["price"])
+            stock_changed = prev is not None and prev.get("in_stock", True) != now_in
+
+            if not (price_changed or below or stock_changed):
                 continue
 
-            if prev is None:
-                emoji = "NUEVO"
+            # Determinar el tipo principal de alerta
+            if stock_changed and now_in:
+                emoji = "REPUESTO EN STOCK"
+                delta_line = f"\nAntes estaba agotado. Precio ahora: {format_cop(offer['price'])}"
+            elif stock_changed and not now_in:
+                emoji = "AGOTADO"
+                delta_line = f"\nUltimo precio visto: {format_cop(prev['price'])}"
+            elif prev is None:
+                emoji = "NUEVO" + (" [AGOTADO]" if not now_in else "")
                 delta_line = ""
             elif offer["price"] < prev["price"]:
                 emoji = "BAJO"
@@ -163,11 +185,12 @@ def run_once(config, state, first_run):
                 delta = offer["price"] - prev["price"]
                 delta_line = f"\nAntes: {format_cop(prev['price'])}  (+{format_cop(delta)})"
             else:
-                # sin cambio pero bajo umbral
                 emoji = "OFERTA"
                 delta_line = ""
 
             tag = " *POR DEBAJO DEL UMBRAL*" if below else ""
+            if not now_in and "AGOTADO" not in emoji:
+                tag += " [AGOTADO]"
             msg = (
                 f"*{emoji} {offer['store']}*{tag}\n"
                 f"{escape_md(offer['title'])}\n"

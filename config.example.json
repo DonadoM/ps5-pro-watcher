@@ -12,6 +12,7 @@
   "stores_enabled": {
     "Exito": true,
     "Falabella": true,
+    "Homecenter": false,
     "Alkosto": true,
     "Ktronix": true,
     "MercadoLibre": false
