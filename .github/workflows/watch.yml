@@ -1,0 +1,50 @@
+name: PS5 Pro price watch
+
+on:
+  schedule:
+    # Cada 3 horas en punto UTC. GitHub programa best-effort, puede haber retraso.
+    - cron: '0 */3 * * *'
+  workflow_dispatch:  # boton "Run workflow" en la UI
+
+concurrency:
+  group: watcher
+  cancel-in-progress: false
+
+permissions:
+  contents: write  # para commit del state.json actualizado
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Run one cycle
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          THRESHOLD_COP: ${{ vars.THRESHOLD_COP }}
+        run: python watcher.py --once
+
+      - name: Commit state.json
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [[ -n "$(git status --porcelain state.json)" ]]; then
+            git add state.json
+            git commit -m "state: $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+          else
+            echo "state.json sin cambios"
+          fi

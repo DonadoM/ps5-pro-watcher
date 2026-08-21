@@ -1,0 +1,6 @@
+config.json
+watcher.log
+__pycache__/
+*.pyc
+tmp_*.html
+.venv/
