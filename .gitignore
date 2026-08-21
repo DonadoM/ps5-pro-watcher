@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 tmp_*.html
 .venv/
+*.lnk

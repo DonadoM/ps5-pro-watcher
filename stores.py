@@ -86,7 +86,7 @@ def _fetch_vtex(store_name: str, base_url: str, search_terms):
             offer = sellers[0].get("commertialOffer") or {}
             price = offer.get("Price") or 0
             available = offer.get("AvailableQuantity") or 0
-            if price <= 0 or available <= 0:
+            if price <= 0:
                 continue
             link = prod.get("linkText") or ""
             results.append({
@@ -94,6 +94,7 @@ def _fetch_vtex(store_name: str, base_url: str, search_terms):
                 "title": title.strip(),
                 "price": int(price),
                 "url": f"{base_url}/{link}/p" if link else base_url,
+                "in_stock": available > 0,
             })
             seen_ids.add(pid)
     return results
@@ -103,31 +104,29 @@ def fetch_exito(search_terms, direct_urls=None):
     return _fetch_vtex("Exito", "https://www.exito.com", search_terms)
 
 
-# --- Falabella (parsea __NEXT_DATA__) ---
+# --- Falabella / Homecenter (parsea __NEXT_DATA__ del Grupo Falabella) ---
 
-def fetch_falabella(search_terms, direct_urls=None):
+def _fetch_falabella_group(store_name, base_url, search_url, search_terms):
     results = []
     seen_ids = set()
     for term in search_terms:
-        url = "https://www.falabella.com.co/falabella-co/search"
-        params = {"Ntt": term}
         try:
-            r = requests.get(url, params=params, headers=UA, timeout=25)
+            r = requests.get(search_url, params={"Ntt": term}, headers=UA, timeout=25)
             r.raise_for_status()
             html = r.text
         except Exception as e:
-            logging.warning("Falabella search '%s' fallo: %s", term, e)
+            logging.warning("%s search '%s' fallo: %s", store_name, term, e)
             continue
         m = re.search(
             r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL
         )
         if not m:
-            logging.info("Falabella: sin __NEXT_DATA__ para '%s'", term)
+            logging.info("%s: sin __NEXT_DATA__ para '%s'", store_name, term)
             continue
         try:
             payload = json.loads(m.group(1))
         except Exception as e:
-            logging.warning("Falabella JSON parse fallo: %s", e)
+            logging.warning("%s JSON parse fallo: %s", store_name, e)
             continue
 
         def walk(node):
@@ -136,6 +135,11 @@ def fetch_falabella(search_terms, direct_urls=None):
                 prices = node.get("prices")
                 pid = node.get("productId") or node.get("skuId") or node.get("id")
                 url_frag = node.get("url") or node.get("productUrl")
+                stock_status = (
+                    node.get("stockLevelStatus")
+                    or node.get("availabilityStatus")
+                    or ""
+                )
                 if title and isinstance(prices, list) and prices and pid and url_frag:
                     if is_ps5_pro_console(title):
                         vals = []
@@ -152,13 +156,19 @@ def fetch_falabella(search_terms, direct_urls=None):
                             best = min(vals)
                             full_url = (
                                 url_frag if url_frag.startswith("http")
-                                else f"https://www.falabella.com.co{url_frag}"
+                                else f"{base_url}{url_frag}"
                             )
+                            in_stock = True
+                            if isinstance(stock_status, str) and stock_status:
+                                low = stock_status.lower()
+                                if any(x in low for x in ("outofstock", "out_of_stock", "sinstock", "no_stock", "unavailable")):
+                                    in_stock = False
                             results.append({
                                 "id": str(pid),
                                 "title": title.strip(),
                                 "price": best,
                                 "url": full_url,
+                                "in_stock": in_stock,
                             })
                             seen_ids.add(str(pid))
                 for v in node.values():
@@ -171,6 +181,24 @@ def fetch_falabella(search_terms, direct_urls=None):
     return results
 
 
+def fetch_falabella(search_terms, direct_urls=None):
+    return _fetch_falabella_group(
+        "Falabella",
+        "https://www.falabella.com.co",
+        "https://www.falabella.com.co/falabella-co/search",
+        search_terms,
+    )
+
+
+def fetch_homecenter(search_terms, direct_urls=None):
+    return _fetch_falabella_group(
+        "Homecenter",
+        "https://www.homecenter.com.co",
+        "https://www.homecenter.com.co/homecenter-co/search",
+        search_terms,
+    )
+
+
 # --- URL directa (Alkosto, Ktronix, cualquier tienda) ---
 
 JSONLD_PATTERN = re.compile(
@@ -179,8 +207,20 @@ JSONLD_PATTERN = re.compile(
 )
 
 
+def _availability_from_string(s: str) -> bool:
+    """True si el availability schema.org indica disponible."""
+    if not s:
+        return True  # sin dato -> asumimos disponible para no ocultar la oferta
+    s = s.lower()
+    if "outofstock" in s or "out_of_stock" in s or "soldout" in s or "discontinued" in s:
+        return False
+    if "instock" in s or "in_stock" in s or "onlineonly" in s or "preorder" in s:
+        return True
+    return True
+
+
 def _extract_price_from_html(html: str):
-    """Intenta extraer (title, price) desde JSON-LD, OpenGraph o meta itemprop."""
+    """Devuelve (title, price, in_stock) desde JSON-LD, OpenGraph o itemprop."""
     # 1) JSON-LD Product
     for m in JSONLD_PATTERN.finditer(html):
         raw = m.group(1).strip()
@@ -204,9 +244,10 @@ def _extract_price_from_html(html: str):
                     price_int = int(float(price)) if price else 0
                 except Exception:
                     price_int = 0
+                in_stock = _availability_from_string(offers.get("availability", ""))
                 if name and price_int > 0:
-                    return name.strip(), price_int
-    # 2) og:title + og:price:amount
+                    return name.strip(), price_int, in_stock
+    # 2) og:title + og:price:amount + og:availability
     og_title = re.search(
         r'<meta[^>]+property="og:title"[^>]+content="([^"]+)"', html
     )
@@ -214,26 +255,36 @@ def _extract_price_from_html(html: str):
         r'<meta[^>]+property="(?:og:price:amount|product:price:amount)"[^>]+content="([^"]+)"',
         html,
     )
+    og_avail = re.search(
+        r'<meta[^>]+property="(?:og:availability|product:availability)"[^>]+content="([^"]+)"',
+        html,
+    )
     if og_title and og_price:
         try:
             p = int(float(re.sub(r"[^\d.]", "", og_price.group(1))))
             if p > 0:
-                return og_title.group(1).strip(), p
+                in_stock = _availability_from_string(og_avail.group(1) if og_avail else "")
+                return og_title.group(1).strip(), p, in_stock
         except Exception:
             pass
-    # 3) itemprop=price
+    # 3) itemprop=price + itemprop=availability
     ip = re.search(
         r'<meta[^>]+itemprop="price"[^>]+content="([^"]+)"', html
     )
     ttl = re.search(r"<title>([^<]+)</title>", html)
+    ia = re.search(
+        r'<(?:meta|link)[^>]+itemprop="availability"[^>]+(?:href|content)="([^"]+)"',
+        html,
+    )
     if ip and ttl:
         try:
             p = int(float(re.sub(r"[^\d.]", "", ip.group(1))))
             if p > 0:
-                return ttl.group(1).strip(), p
+                in_stock = _availability_from_string(ia.group(1) if ia else "")
+                return ttl.group(1).strip(), p, in_stock
         except Exception:
             pass
-    return None, None
+    return None, None, True
 
 
 def _fetch_direct_urls(store_name: str, urls):
@@ -248,7 +299,7 @@ def _fetch_direct_urls(store_name: str, urls):
         except Exception as e:
             logging.warning("%s URL %s fallo: %s", store_name, url, e)
             continue
-        title, price = _extract_price_from_html(r.text)
+        title, price, in_stock = _extract_price_from_html(r.text)
         if not price:
             logging.info("%s URL %s: no se pudo extraer precio", store_name, url)
             continue
@@ -258,6 +309,7 @@ def _fetch_direct_urls(store_name: str, urls):
             "title": (title or url)[:200],
             "price": price,
             "url": url,
+            "in_stock": in_stock,
         })
     return results
 
@@ -367,6 +419,7 @@ def fetch_mercadolibre(search_terms, direct_urls=None):
 ALL_STORES = {
     "Exito": fetch_exito,
     "Falabella": fetch_falabella,
+    "Homecenter": fetch_homecenter,
     "Alkosto": fetch_alkosto,
     "Ktronix": fetch_ktronix,
     "MercadoLibre": fetch_mercadolibre,
