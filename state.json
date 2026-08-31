@@ -2,7 +2,7 @@
   "Exito::103972507": {
     "store": "Exito",
     "title": "Consola Playstation 5 Pro 2Tb Digital + 2 Mandos+ Cargador Dobe",
-    "price": 4989097,
+    "price": 4989074,
     "url": "https://www.exito.com/consola-playstation-5-pro-2tb-digital-2-mandos-cargador-dobe-103972507-mp/p",
     "in_stock": true
   },
@@ -11,13 +11,6 @@
     "title": "Consola Playstation 5 Pro Digital 2 TB",
     "price": 4599900,
     "url": "https://www.falabella.com.co/falabella-co/product/145535455/Consola-Playstation-5-Pro-Digital-2-TB",
-    "in_stock": true
-  },
-  "Falabella::139659096": {
-    "store": "Falabella",
-    "title": "Consola PlayStation 5 Pro",
-    "price": 4299900,
-    "url": "https://www.falabella.com.co/falabella-co/product/139659096/Consola-PlayStation-5-Pro",
     "in_stock": true
   },
   "Alkosto::nco_1_control_inalambrico_p_711719595700": {
@@ -33,6 +26,14 @@
     "price": 4199900,
     "url": "https://www.ktronix.com/consola-ps5-pro-digital-2-tb-blanco-1-control-inalambrico/p/711719595700",
     "in_stock": false
+  },
+  "Falabella::139659096": {
+    "store": "Falabella",
+    "title": "Consola PlayStation 5 Pro",
+    "price": 4299900,
+    "url": "https://www.falabella.com.co/falabella-co/product/139659096/Consola-PlayStation-5-Pro",
+    "in_stock": true,
+    "_stale": true
   },
   "Falabella::156109421": {
     "store": "Falabella",
