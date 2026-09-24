@@ -20,13 +20,6 @@
     "url": "https://www.exito.com/consola-playstation-5-pro-2tb-digital-2-mandos-cargador-dobe-103972507-mp/p",
     "in_stock": true
   },
-  "Falabella::156109421": {
-    "store": "Falabella",
-    "title": "Consola PlayStation 5 Pro Digital 2TB + 2 Controles DualSense+ Cargador Dobe",
-    "price": 5299800,
-    "url": "https://www.falabella.com.co/falabella-co/product/156109421/consola-playstation-5-pro-digital-2tb-2-controles-dualsense-base-de-carga-dobe",
-    "in_stock": true
-  },
   "Alkosto::nco_1_control_inalambrico_p_711719595700": {
     "store": "Alkosto",
     "title": "Consola PS5 PRO Digital 2 TB Blanco + 1 Control",
@@ -40,6 +33,14 @@
     "price": 4199900,
     "url": "https://www.ktronix.com/consola-ps5-pro-digital-2-tb-blanco-1-control-inalambrico/p/711719595700",
     "in_stock": false
+  },
+  "Falabella::156109421": {
+    "store": "Falabella",
+    "title": "Consola PlayStation 5 Pro Digital 2TB + 2 Controles DualSense+ Cargador Dobe",
+    "price": 5299800,
+    "url": "https://www.falabella.com.co/falabella-co/product/156109421/consola-playstation-5-pro-digital-2tb-2-controles-dualsense-base-de-carga-dobe",
+    "in_stock": true,
+    "_stale": true
   },
   "Falabella::145535455": {
     "store": "Falabella",
