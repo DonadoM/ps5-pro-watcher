@@ -3,9 +3,18 @@
   "telegram_chat_id": "PEGA_AQUI_TU_CHAT_ID",
   "threshold_cop": 3500000,
   "min_change_pct": 1.0,
-  "search_terms": ["ps5 pro", "playstation 5 pro"],
+  "search_terms": [
+    "ps5 pro",
+    "playstation 5 pro"
+  ],
   "direct_urls": {
-    "_comentario": "Deja las listas vacias y descubrira PS5 Pro auto via sitemap. Solo llenar si quieres monitorear un URL especifico.",
+    "_comentario": "Exito: lista fija de paginas de producto (su robots.txt no permite /api/ ni el buscador). Alkosto/Ktronix: deja la lista vacia y se descubren via sitemap.",
+    "Exito": [
+      "https://www.exito.com/consola-ps5-pro-blanca-104569527-mp/p",
+      "https://www.exito.com/consola-ps5-pro-2-tb-blanco-3192604/p",
+      "https://www.exito.com/consola-playstation-5-pro-2tb-digital-2-mandos-cargador-dobe-103972507-mp/p",
+      "https://www.exito.com/playstation-5-pro-2tb-104366926-mp/p"
+    ],
     "Alkosto": [],
     "Ktronix": []
   },

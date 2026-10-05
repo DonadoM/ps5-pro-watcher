@@ -1,3 +1,4 @@
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -5,6 +6,7 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import stores  # noqa: E402
 import watcher  # noqa: E402
 from stores import is_ps5_pro_console  # noqa: E402
 
@@ -111,6 +113,45 @@ class MinChangeTest(unittest.TestCase):
         with mock.patch.dict(CONFIG, {"threshold_cop": 4_990_000}):
             self.assertEqual(len(self.step(4_989_000)[1]), 1)
             self.assertEqual(self.step(4_988_500)[1], [])
+
+
+def product_page(offers):
+    data = {"@type": "Product", "name": "Consola PS5 Pro", "offers": offers}
+    return f'<script type="application/ld+json">{json.dumps(data)}</script>'
+
+
+class ProductPageTest(unittest.TestCase):
+    def test_picks_cheapest_in_stock_offer(self):
+        html = product_page([
+            {"price": 4_799_800, "availability": "https://schema.org/InStock"},
+            {"price": 4_199_900, "availability": "https://schema.org/OutOfStock"},
+            {"price": 4_798_136, "availability": "https://schema.org/InStock"},
+            {"price": 0, "availability": "https://schema.org/OutOfStock"},
+        ])
+        self.assertEqual(stores._extract_price_from_html(html), ("Consola PS5 Pro", 4_798_136, True))
+
+    def test_all_out_of_stock_returns_cheapest(self):
+        html = product_page([
+            {"price": "4.599.900", "availability": "https://schema.org/OutOfStock"},
+            {"price": 4_299_900, "availability": "https://schema.org/OutOfStock"},
+        ])
+        self.assertEqual(stores._extract_price_from_html(html), ("Consola PS5 Pro", 4_299_900, False))
+
+    def test_single_offer_object(self):
+        html = product_page({"price": "4199900", "availability": "https://schema.org/InStock"})
+        self.assertEqual(stores._extract_price_from_html(html), ("Consola PS5 Pro", 4_199_900, True))
+
+    def test_exito_keeps_product_id_from_url(self):
+        def fake_get(url, **_kwargs):
+            return mock.Mock(text=product_page({"price": 1, "availability": "InStock"}),
+                             raise_for_status=lambda: None)
+
+        urls = ["https://www.exito.com/consola-ps5-pro-blanca-104569527-mp/p",
+                "https://www.exito.com/consola-ps5-pro-2-tb-blanco-3192604/p"]
+        with mock.patch.object(stores.requests, "get", fake_get), \
+                mock.patch.object(stores, "REQUEST_DELAY_S", 0):
+            ids = [o["id"] for o in stores.fetch_exito([], direct_urls=urls)]
+        self.assertEqual(ids, ["104569527", "3192604"])
 
 
 class ConsoleFilterTest(unittest.TestCase):

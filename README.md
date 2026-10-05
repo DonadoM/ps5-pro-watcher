@@ -24,7 +24,7 @@ Bot que vigila el precio y el stock de la **PS5 Pro** en tiendas colombianas (É
 ```mermaid
 flowchart LR
     cron["GitHub Actions<br/>cron cada 3 h"] --> watcher["watcher.py"]
-    watcher --> exito["Éxito<br/>API VTEX"]
+    watcher --> exito["Éxito<br/>páginas de producto + JSON-LD"]
     watcher --> falabella["Falabella<br/>__NEXT_DATA__ de Next.js"]
     watcher --> alkosto["Alkosto / Ktronix<br/>sitemap + JSON-LD"]
     watcher -- "cambios" --> telegram["Alerta en Telegram"]
@@ -37,11 +37,11 @@ Cada tienda expone sus datos de forma distinta, así que hay un adaptador por pl
 
 | Tienda | Técnica |
 |---|---|
-| Éxito | API pública de catálogo de VTEX (`/api/catalog_system/pub/products/search`) |
+| Éxito | Lista fija de páginas de producto + JSON-LD (su `robots.txt` no permite `/api/` ni el buscador, y su sitemap no lista productos) |
 | Falabella | JSON embebido por Next.js en `<script id="__NEXT_DATA__">` |
 | Alkosto, Ktronix | Descubrimiento por `sitemap-productos.xml` + datos estructurados JSON-LD de schema.org |
 
-Un filtro (`is_ps5_pro_console`) descarta accesorios, juegos y otros modelos que aparecen al buscar "PS5 Pro".
+Un filtro (`is_ps5_pro_console`) descarta accesorios, juegos y otros modelos que aparecen al buscar "PS5 Pro". Cuando un producto tiene varios vendedores, se toma la oferta más barata con stock.
 
 ### Decisiones de diseño
 
@@ -68,7 +68,18 @@ En repositorios públicos GitHub Actions es gratis. En privados, este bot usa un
 | `threshold_cop` | Alerta especial cuando el precio cruza este valor |
 | `min_change_pct` | Cambio mínimo de precio (%) para alertar. Default: 1 |
 | `stores_enabled` | Activa o desactiva tiendas |
-| `direct_urls` | URLs de producto específicas para Alkosto/Ktronix (si no, usa el sitemap) |
+| `direct_urls` | Páginas de producto a revisar. Obligatorio para Éxito; opcional para Alkosto/Ktronix (si está vacío, usa su sitemap) |
+
+## Uso responsable
+
+Este proyecto es personal y sin fines comerciales:
+
+- **Solo datos públicos:** precios y stock que cualquiera ve sin iniciar sesión. No recolecta datos personales.
+- **Respeta el `robots.txt` de cada tienda:** usa únicamente las rutas que permiten (páginas de producto, sitemaps y, en Falabella, el buscador). Por eso Éxito se consulta con una lista fija de productos en lugar de su API.
+- **Carga mínima:** una pasada cada 3 horas, con pausa entre páginas de una misma tienda.
+- **Sin contenido protegido:** guarda nombre, precio, stock y URL de cada producto; no copia imágenes ni descripciones.
+
+Si representas a alguna de estas tiendas y prefieres que no se consulte tu sitio, abre un issue y lo retiro.
 
 ## Desarrollo local
 

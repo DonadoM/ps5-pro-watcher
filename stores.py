@@ -6,6 +6,8 @@ Solo consolas PS5 Pro (filtra accesorios y juegos).
 import json
 import logging
 import re
+import time
+
 import requests
 
 UA = {
@@ -17,6 +19,8 @@ UA = {
     "Accept": "application/json, text/html, */*",
     "Accept-Language": "es-CO,es;q=0.9,en;q=0.8",
 }
+
+REQUEST_DELAY_S = 1.0  # pausa entre paginas de producto de una misma tienda
 
 # Palabras que NO deben aparecer en el titulo. NO incluyo "control/mando/dualsense"
 # porque toda PS5 Pro viene con uno o dos controles en la caja.
@@ -52,56 +56,26 @@ def is_ps5_pro_console(title: str) -> bool:
     return True
 
 
-# --- VTEX (Exito) ---
+# --- Exito (paginas de producto) ---
+# El robots.txt de Exito pide no usar /api/ ni el buscador (/s?), y su sitemap no
+# lista productos. Por eso se revisa una lista fija de paginas de producto
+# (config.json -> direct_urls.Exito), que si estan permitidas.
 
-def _fetch_vtex(store_name: str, base_url: str, search_terms):
-    results = []
-    seen_ids = set()
-    for term in search_terms:
-        url = f"{base_url}/api/catalog_system/pub/products/search"
-        params = {"ft": term, "_from": 0, "_to": 49}
-        try:
-            r = requests.get(url, params=params, headers=UA, timeout=20)
-            r.raise_for_status()
-            data = r.json()
-        except Exception as e:
-            logging.warning("%s search '%s' fallo: %s", store_name, term, e)
-            continue
-        if not isinstance(data, list):
-            continue
-        for prod in data:
-            title = prod.get("productName") or ""
-            if not is_ps5_pro_console(title):
-                continue
-            pid = str(prod.get("productId") or "")
-            if not pid or pid in seen_ids:
-                continue
-            items = prod.get("items") or []
-            if not items:
-                continue
-            item = items[0]
-            sellers = item.get("sellers") or []
-            if not sellers:
-                continue
-            offer = sellers[0].get("commertialOffer") or {}
-            price = offer.get("Price") or 0
-            available = offer.get("AvailableQuantity") or 0
-            if price <= 0:
-                continue
-            link = prod.get("linkText") or ""
-            results.append({
-                "id": pid,
-                "title": title.strip(),
-                "price": int(price),
-                "url": f"{base_url}/{link}/p" if link else base_url,
-                "in_stock": available > 0,
-            })
-            seen_ids.add(pid)
-    return results
+EXITO_ID = re.compile(r"-(\d+)(?:-mp)?/p/?$")
 
 
 def fetch_exito(search_terms, direct_urls=None):
-    return _fetch_vtex("Exito", "https://www.exito.com", search_terms)
+    if not direct_urls:
+        logging.info("Exito: sin URLs en direct_urls.Exito, se omite")
+        return []
+
+    def product_id(url):
+        m = EXITO_ID.search(url.split("?")[0])
+        return m.group(1) if m else None
+
+    # La lista es curada a mano: no se aplica is_ps5_pro_console (Exito a veces
+    # titula la consola sin la palabra "Consola").
+    return _fetch_direct_urls("Exito", direct_urls, id_from_url=product_id)
 
 
 # --- Falabella / Homecenter (parsea __NEXT_DATA__ del Grupo Falabella) ---
@@ -219,6 +193,20 @@ def _availability_from_string(s: str) -> bool:
     return True
 
 
+def _parse_price(price) -> int:
+    """Acepta 4599900, "4599900.00", "$4.599.900" o "4,599,900"."""
+    if isinstance(price, str):
+        price = re.sub(r"[^\d.,]", "", price)
+        if re.fullmatch(r"\d{1,3}([.,]\d{3})+", price):
+            price = re.sub(r"[.,]", "", price)  # separadores de miles
+        else:
+            price = price.replace(",", ".")
+    try:
+        return int(float(price)) if price else 0
+    except Exception:
+        return 0
+
+
 def _extract_price_from_html(html: str):
     """Devuelve (title, price, in_stock) desde JSON-LD, OpenGraph o itemprop."""
     # 1) JSON-LD Product
@@ -235,17 +223,20 @@ def _extract_price_from_html(html: str):
             if entry.get("@type") in ("Product", "product"):
                 name = entry.get("name") or ""
                 offers = entry.get("offers") or {}
-                if isinstance(offers, list):
-                    offers = offers[0] if offers else {}
-                price = offers.get("price") or offers.get("lowPrice")
-                if isinstance(price, str):
-                    price = re.sub(r"[^\d.]", "", price).split(".")[0]
-                try:
-                    price_int = int(float(price)) if price else 0
-                except Exception:
-                    price_int = 0
-                in_stock = _availability_from_string(offers.get("availability", ""))
-                if name and price_int > 0:
+                if not isinstance(offers, list):
+                    offers = [offers]
+                # Varios vendedores por producto: la oferta mas barata con stock;
+                # si ninguna tiene stock, la mas barata.
+                parsed = []
+                for offer in offers:
+                    if not isinstance(offer, dict):
+                        continue
+                    price_int = _parse_price(offer.get("price") or offer.get("lowPrice"))
+                    if price_int > 0:
+                        in_stock = _availability_from_string(offer.get("availability", ""))
+                        parsed.append((not in_stock, price_int, in_stock))
+                if name and parsed:
+                    _, price_int, in_stock = min(parsed)
                     return name.strip(), price_int, in_stock
     # 2) og:title + og:price:amount + og:availability
     og_title = re.search(
@@ -261,7 +252,7 @@ def _extract_price_from_html(html: str):
     )
     if og_title and og_price:
         try:
-            p = int(float(re.sub(r"[^\d.]", "", og_price.group(1))))
+            p = _parse_price(og_price.group(1))
             if p > 0:
                 in_stock = _availability_from_string(og_avail.group(1) if og_avail else "")
                 return og_title.group(1).strip(), p, in_stock
@@ -278,7 +269,7 @@ def _extract_price_from_html(html: str):
     )
     if ip and ttl:
         try:
-            p = int(float(re.sub(r"[^\d.]", "", ip.group(1))))
+            p = _parse_price(ip.group(1))
             if p > 0:
                 in_stock = _availability_from_string(ia.group(1) if ia else "")
                 return ttl.group(1).strip(), p, in_stock
@@ -287,12 +278,14 @@ def _extract_price_from_html(html: str):
     return None, None, True
 
 
-def _fetch_direct_urls(store_name: str, urls):
+def _fetch_direct_urls(store_name: str, urls, id_from_url=None):
     """Monitorea precios de URLs de producto especificas."""
     results = []
-    for url in urls or []:
+    for i, url in enumerate(urls or []):
         if not url or not isinstance(url, str):
             continue
+        if i:
+            time.sleep(REQUEST_DELAY_S)  # no saturar el sitio
         try:
             r = requests.get(url, headers=UA, timeout=25, allow_redirects=True)
             r.raise_for_status()
@@ -303,7 +296,7 @@ def _fetch_direct_urls(store_name: str, urls):
         if not price:
             logging.info("%s URL %s: no se pudo extraer precio", store_name, url)
             continue
-        pid = re.sub(r"[^a-zA-Z0-9]", "_", url)[-40:]
+        pid = (id_from_url(url) if id_from_url else None) or re.sub(r"[^a-zA-Z0-9]", "_", url)[-40:]
         results.append({
             "id": pid,
             "title": (title or url)[:200],
@@ -322,8 +315,7 @@ def _discover_from_sitemap(base_url: str, keywords):
     cache_key = base_url
     if cache_key in _SITEMAP_CACHE:
         cached_at, urls = _SITEMAP_CACHE[cache_key]
-        import time as _t
-        if _t.time() - cached_at < 3600:
+        if time.time() - cached_at < 3600:
             return urls
     urls = []
     sitemap_url = f"{base_url}/sitemap-productos.xml"
@@ -338,8 +330,7 @@ def _discover_from_sitemap(base_url: str, keywords):
         low = u.lower()
         if any(k in low for k in keywords):
             urls.append(u)
-    import time as _t
-    _SITEMAP_CACHE[cache_key] = (_t.time(), urls)
+    _SITEMAP_CACHE[cache_key] = (time.time(), urls)
     return urls
 
 
