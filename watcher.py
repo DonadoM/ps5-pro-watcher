@@ -1,17 +1,18 @@
 """
 PS5 Pro price watcher para Colombia.
-Modo default: loop infinito cada N horas (uso local con run_hidden.vbs).
-Modo --once: una sola pasada y sale (uso en GitHub Actions cron).
+Hace una pasada por todas las tiendas, alerta cambios por Telegram, guarda
+state.json y agrega los cambios a data/history.csv. Lo ejecuta GitHub Actions
+cada 3 horas (.github/workflows/watch.yml).
 """
 import argparse
 import json
 import logging
 import os
 import sys
-import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
+from history import append_events, make_event
 from notifier import send_telegram
 from stores import ALL_STORES
 
@@ -19,19 +20,15 @@ BASE = Path(__file__).resolve().parent
 CONFIG_FILE = BASE / "config.json"
 EXAMPLE_FILE = BASE / "config.example.json"
 STATE_FILE = BASE / "state.json"
-LOG_FILE = BASE / "watcher.log"
 
+# Un producto tiene que faltar en estas corridas seguidas antes de avisar que
+# desaparecio. Los buscadores de las tiendas a veces omiten un producto en una
+# sola corrida y eso generaba falsas alertas de "AGOTADO/RETIRADO".
+MISSES_BEFORE_GONE = 2
 
-def _setup_logging(also_stdout: bool):
-    handlers = [logging.FileHandler(str(LOG_FILE), encoding="utf-8")]
-    if also_stdout:
-        handlers.append(logging.StreamHandler(sys.stdout))
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=handlers,
-        force=True,
-    )
+# Algunos vendedores de Exito cambian el precio unos pesos en cada corrida
+# (repricing automatico). Cambios menores a esto no generan alerta.
+DEFAULT_MIN_CHANGE_PCT = 1.0
 
 
 def load_config():
@@ -90,9 +87,10 @@ def escape_md(text: str) -> str:
     return text.replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
 
 
-def run_once(config, state, first_run):
+def fetch_all(config, state):
+    """Devuelve (ofertas actuales por key, tiendas que no dieron datos confiables)."""
     current = {}
-    per_store_counts = {}
+    failed_stores = set()
     direct_urls_by_store = config.get("direct_urls", {}) or {}
     for store_name, fetcher in ALL_STORES.items():
         if not config.get("stores_enabled", {}).get(store_name, True):
@@ -105,8 +103,17 @@ def run_once(config, state, first_run):
             offers = fetcher(config["search_terms"], direct_urls=urls)
         except Exception as e:
             logging.exception("%s fallo: %s", store_name, e)
+            failed_stores.add(store_name)
             continue
-        per_store_counts[store_name] = len(offers)
+        had_offers = any(
+            v.get("store") == store_name and not v.get("_stale") for v in state.values()
+        )
+        if not offers and had_offers:
+            # Cero resultados cuando antes habia ofertas suele ser bloqueo o caida
+            # del sitio, no que se agotaron todas a la vez.
+            logging.warning("%s: 0 ofertas (antes habia), se ignora esta corrida", store_name)
+            failed_stores.add(store_name)
+            continue
         in_stock_n = sum(1 for o in offers if o.get("in_stock", True))
         logging.info(
             "%s: %d oferta(s), %d con stock",
@@ -121,149 +128,186 @@ def run_once(config, state, first_run):
                 "url": offer["url"],
                 "in_stock": bool(offer.get("in_stock", True)),
             }
+    return current, failed_stores
 
+
+def send_startup_summary(config, current, notify):
     threshold = int(config.get("threshold_cop", 0) or 0)
-    token = config["telegram_bot_token"]
-    chat_id = config["telegram_chat_id"]
+    if not current:
+        notify(
+            "*PS5 Pro watcher iniciado*\nNo encontre ofertas en esta primera pasada. "
+            "Seguire intentando."
+        )
+        return
+    lines = ["*PS5 Pro - watcher iniciado*", ""]
+    # Ordenar: primero los con stock, dentro de cada grupo por precio
+    ordered = sorted(
+        current.values(),
+        key=lambda x: (not x.get("in_stock", True), x["price"]),
+    )
+    for o in ordered:
+        tag = "" if o.get("in_stock", True) else "  [AGOTADO]"
+        lines.append(
+            f"- {o['store']}: {format_cop(o['price'])}{tag}\n"
+            f"  {escape_md(o['title'][:70])}\n"
+            f"  {o['url']}"
+        )
+    lines.append("")
+    lines.append(f"Umbral configurado: {format_cop(threshold)}")
+    notify("\n".join(lines))
 
-    def stock_tag(o):
-        return "" if o.get("in_stock", True) else "  [AGOTADO]"
 
-    if first_run:
-        # Resumen inicial
-        if current:
-            lines = ["*PS5 Pro - watcher iniciado*", ""]
-            # Ordenar: primero los con stock, dentro de cada grupo por precio
-            ordered = sorted(
-                current.values(),
-                key=lambda x: (not x.get("in_stock", True), x["price"]),
-            )
-            for o in ordered:
-                lines.append(
-                    f"- {o['store']}: {format_cop(o['price'])}{stock_tag(o)}\n"
-                    f"  {escape_md(o['title'][:70])}\n"
-                    f"  {o['url']}"
-                )
-            lines.append("")
-            lines.append(f"Umbral configurado: {format_cop(threshold)}")
-            lines.append(f"Chequeo cada {config['interval_hours']}h")
-            send_telegram(token, chat_id, "\n".join(lines))
-        else:
-            send_telegram(
-                token, chat_id,
-                "*PS5 Pro watcher iniciado*\nNo encontre ofertas en esta primera pasada. "
-                "Seguire intentando.",
-            )
+def alerted_price(prev):
+    return prev.get("_alerted_price", prev["price"])
+
+
+def change_message(offer, prev, threshold, min_change_pct=DEFAULT_MIN_CHANGE_PCT):
+    """Mensaje de alerta para una oferta actual, o None si no hay nada que avisar."""
+    now_in = offer.get("in_stock", True)
+    below = threshold > 0 and offer["price"] <= threshold and now_in
+    returned = prev is not None and prev.get("_stale")
+    stock_changed = prev is not None and prev.get("in_stock", True) != now_in
+    if prev is None:
+        price_changed = True
     else:
-        # Alertas por cambio de precio, cambio de stock o umbral
+        # Contra el ultimo precio avisado, asi una bajada lenta igual alerta al sumar.
+        base = alerted_price(prev)
+        price_changed = abs(offer["price"] - base) / base * 100 >= min_change_pct
+    was_below = (
+        prev is not None and threshold > 0 and prev.get("in_stock", True)
+        and alerted_price(prev) <= threshold
+    )
+    below_news = below and not was_below
+
+    if not (price_changed or below_news or stock_changed or returned):
+        return None
+
+    # Determinar el tipo principal de alerta
+    if returned:
+        emoji = "DE VUELTA" + (" [AGOTADO]" if not now_in else "")
+        delta_line = f"\nUltimo precio visto: {format_cop(prev['price'])}"
+    elif stock_changed and now_in:
+        emoji = "REPUESTO EN STOCK"
+        delta_line = f"\nAntes estaba agotado. Precio ahora: {format_cop(offer['price'])}"
+    elif stock_changed and not now_in:
+        emoji = "AGOTADO"
+        delta_line = f"\nUltimo precio visto: {format_cop(prev['price'])}"
+    elif prev is None:
+        emoji = "NUEVO" + (" [AGOTADO]" if not now_in else "")
+        delta_line = ""
+    elif offer["price"] < alerted_price(prev):
+        emoji = "BAJO"
+        delta = alerted_price(prev) - offer["price"]
+        delta_line = f"\nAntes: {format_cop(alerted_price(prev))}  (-{format_cop(delta)})"
+    elif offer["price"] > alerted_price(prev):
+        emoji = "SUBIO"
+        delta = offer["price"] - alerted_price(prev)
+        delta_line = f"\nAntes: {format_cop(alerted_price(prev))}  (+{format_cop(delta)})"
+    else:
+        emoji = "OFERTA"
+        delta_line = ""
+
+    tag = " *POR DEBAJO DEL UMBRAL*" if below else ""
+    if not now_in and "AGOTADO" not in emoji:
+        tag += " [AGOTADO]"
+    return (
+        f"*{emoji} {offer['store']}*{tag}\n"
+        f"{escape_md(offer['title'])}\n"
+        f"Precio: *{format_cop(offer['price'])}*"
+        f"{delta_line}\n"
+        f"{offer['url']}"
+    )
+
+
+def run_once(config, state, notify, now):
+    """Una pasada completa. Devuelve (nuevo estado, eventos para el historial)."""
+    current, failed_stores = fetch_all(config, state)
+    threshold = int(config.get("threshold_cop", 0) or 0)
+    min_change_pct = float(config.get("min_change_pct", DEFAULT_MIN_CHANGE_PCT))
+    events = []
+
+    if not state:
+        send_startup_summary(config, current, notify)
+    else:
         for key, offer in current.items():
             prev = state.get(key)
-            now_in = offer.get("in_stock", True)
-            below = threshold > 0 and offer["price"] <= threshold and now_in
-            price_changed = (prev is None) or (prev.get("price") != offer["price"])
-            stock_changed = prev is not None and prev.get("in_stock", True) != now_in
+            msg = change_message(offer, prev, threshold, min_change_pct)
+            if msg:
+                notify(msg)
+            elif prev is not None:
+                # Sin alerta: se recuerda el ultimo precio avisado para comparar despues.
+                offer["_alerted_price"] = alerted_price(prev)
 
-            if not (price_changed or below or stock_changed):
-                continue
+    for key, offer in current.items():
+        prev = state.get(key)
+        if (
+            prev is None or prev.get("_stale")
+            or (prev["price"], prev.get("in_stock", True)) != (offer["price"], offer["in_stock"])
+        ):
+            events.append(make_event(now, key, offer))
 
-            # Determinar el tipo principal de alerta
-            if stock_changed and now_in:
-                emoji = "REPUESTO EN STOCK"
-                delta_line = f"\nAntes estaba agotado. Precio ahora: {format_cop(offer['price'])}"
-            elif stock_changed and not now_in:
-                emoji = "AGOTADO"
-                delta_line = f"\nUltimo precio visto: {format_cop(prev['price'])}"
-            elif prev is None:
-                emoji = "NUEVO" + (" [AGOTADO]" if not now_in else "")
-                delta_line = ""
-            elif offer["price"] < prev["price"]:
-                emoji = "BAJO"
-                delta = prev["price"] - offer["price"]
-                delta_line = f"\nAntes: {format_cop(prev['price'])}  (-{format_cop(delta)})"
-            elif offer["price"] > prev["price"]:
-                emoji = "SUBIO"
-                delta = offer["price"] - prev["price"]
-                delta_line = f"\nAntes: {format_cop(prev['price'])}  (+{format_cop(delta)})"
-            else:
-                emoji = "OFERTA"
-                delta_line = ""
-
-            tag = " *POR DEBAJO DEL UMBRAL*" if below else ""
-            if not now_in and "AGOTADO" not in emoji:
-                tag += " [AGOTADO]"
-            msg = (
-                f"*{emoji} {offer['store']}*{tag}\n"
-                f"{escape_md(offer['title'])}\n"
-                f"Precio: *{format_cop(offer['price'])}*"
-                f"{delta_line}\n"
-                f"{offer['url']}"
-            )
-            send_telegram(token, chat_id, msg)
-
-        # Detecta productos que desaparecieron
-        for key, prev in state.items():
-            if key not in current:
-                # Solo notificamos una vez: si ya no estaba antes, saltamos
-                if prev.get("_stale"):
-                    continue
-                msg = (
-                    f"*AGOTADO/RETIRADO {prev['store']}*\n"
-                    f"{escape_md(prev['title'])}\n"
-                    f"Ultimo precio visto: {format_cop(prev['price'])}\n"
-                    f"{prev['url']}"
-                )
-                send_telegram(token, chat_id, msg)
-
-    # Nuevo estado: current + marca stale a los desaparecidos que ya notificamos
+    # Productos que no aparecieron en esta corrida
     new_state = dict(current)
     for key, prev in state.items():
-        if key not in current:
-            prev["_stale"] = True
-            new_state[key] = prev
-    return new_state
+        if key in current:
+            continue
+        prev = dict(prev)
+        new_state[key] = prev
+        if prev.get("_stale") or prev["store"] in failed_stores:
+            continue
+        prev["_misses"] = prev.get("_misses", 0) + 1
+        if prev["_misses"] < MISSES_BEFORE_GONE:
+            logging.info("%s no aparecio (%d/%d)", key, prev["_misses"], MISSES_BEFORE_GONE)
+            continue
+        del prev["_misses"]
+        prev["_stale"] = True
+        notify(
+            f"*AGOTADO/RETIRADO {prev['store']}*\n"
+            f"{escape_md(prev['title'])}\n"
+            f"Ultimo precio visto: {format_cop(prev['price'])}\n"
+            f"{prev['url']}"
+        )
+        if prev.get("in_stock", True):
+            events.append(make_event(now, key, prev, in_stock=False))
+    return new_state, events
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--once", action="store_true",
-        help="Corre un solo ciclo y sale (para cron/GitHub Actions).",
+        "--dry-run", action="store_true",
+        help="No envia Telegram ni escribe archivos; imprime lo que haria.",
     )
+    # --once se mantiene por compatibilidad: ahora siempre es una sola pasada.
+    parser.add_argument("--once", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
-    _setup_logging(also_stdout=args.once)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        stream=sys.stdout,
+    )
+    if args.dry_run:
+        os.environ.setdefault("TELEGRAM_BOT_TOKEN", "dry-run")
+        os.environ.setdefault("TELEGRAM_CHAT_ID", "dry-run")
     config = load_config()
     state = load_state()
-    first_run = not state
 
-    if args.once:
-        logging.info(
-            "Modo --once. umbral=%s COP, first_run=%s",
-            config.get("threshold_cop"), first_run,
-        )
-        state = run_once(config, state, first_run)
-        save_state(state)
-        logging.info("Ciclo completado, saliendo.")
+    def notify(text):
+        if args.dry_run:
+            print("--- Telegram (dry-run) ---\n" + text)
+        else:
+            send_telegram(config["telegram_bot_token"], config["telegram_chat_id"], text)
+
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    logging.info("Umbral=%s COP, primera corrida=%s", config.get("threshold_cop"), not state)
+    state, events = run_once(config, state, notify, now)
+    if args.dry_run:
+        logging.info("dry-run: %d evento(s) de historial, no se guarda nada", len(events))
         return
-
-    interval = float(config.get("interval_hours", 3)) * 3600
-    logging.info(
-        "Watcher iniciado (loop). Intervalo=%ss, umbral=%s COP, first_run=%s",
-        int(interval), config.get("threshold_cop"), first_run,
-    )
-    while True:
-        try:
-            state = run_once(config, state, first_run)
-            save_state(state)
-            first_run = False
-        except Exception:
-            logging.exception("run_once crash")
-        logging.info(
-            "Esperando %.1f h hasta la proxima corrida (%s)",
-            interval / 3600,
-            datetime.now().isoformat(timespec="seconds"),
-        )
-        time.sleep(interval)
+    save_state(state)
+    append_events(events)
+    logging.info("Ciclo completado: %d evento(s) de historial.", len(events))
 
 
 if __name__ == "__main__":
