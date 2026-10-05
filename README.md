@@ -1,5 +1,7 @@
 # PS5 Pro Watcher 🎮
 
+[![Tests](https://github.com/DonadoM/ps5-pro-watcher/actions/workflows/tests.yml/badge.svg)](https://github.com/DonadoM/ps5-pro-watcher/actions/workflows/tests.yml)
+
 Bot que vigila el precio y el stock de la **PS5 Pro** en tiendas colombianas (Éxito, Falabella, Alkosto, Ktronix) y avisa por **Telegram** cuando algo cambia. Corre solo en **GitHub Actions**: sin servidor, sin PC encendido y sin costo.
 
 > *A serverless bot that tracks PS5 Pro prices and stock across Colombian retailers and alerts via Telegram. Runs every 3 hours on GitHub Actions cron and uses git itself as its price-history database.*
