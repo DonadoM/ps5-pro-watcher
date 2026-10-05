@@ -18,10 +18,17 @@
   "Exito::103972507": {
     "store": "Exito",
     "title": "Consola Playstation 5 Pro 2Tb Digital + 2 Mandos+ Cargador Dobe",
-    "price": 4799800,
+    "price": 4798136,
     "url": "https://www.exito.com/consola-playstation-5-pro-2tb-digital-2-mandos-cargador-dobe-103972507-mp/p",
     "in_stock": true,
     "_alerted_price": 4799800
+  },
+  "Exito::104366926": {
+    "store": "Exito",
+    "title": "Playstation 5 Pro 2Tb",
+    "price": 4845996,
+    "url": "https://www.exito.com/playstation-5-pro-2tb-104366926-mp/p",
+    "in_stock": true
   },
   "Falabella::156109421": {
     "store": "Falabella",
@@ -60,14 +67,6 @@
     "title": "Consola PlayStation 5 Pro",
     "price": 4299900,
     "url": "https://www.falabella.com.co/falabella-co/product/139659096/Consola-PlayStation-5-Pro",
-    "in_stock": true,
-    "_stale": true
-  },
-  "Exito::104366926": {
-    "store": "Exito",
-    "title": "Consola Playstation 5 Pro 2Tb",
-    "price": 4849000,
-    "url": "https://www.exito.com/playstation-5-pro-2tb-104366926-mp/p",
     "in_stock": true,
     "_stale": true
   }
