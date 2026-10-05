@@ -30,21 +30,27 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
+      - name: Tests
+        run: python -m unittest discover -s tests
+
       - name: Run one cycle
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           THRESHOLD_COP: ${{ vars.THRESHOLD_COP }}
-        run: python watcher.py --once
+        run: python watcher.py
 
-      - name: Commit state.json
+      - name: Update price chart
+        run: python chart.py
+
+      - name: Commit state and history
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if [[ -n "$(git status --porcelain state.json)" ]]; then
-            git add state.json
+          git add state.json data/ docs/
+          if git diff --cached --quiet; then
+            echo "Sin cambios"
+          else
             git commit -m "state: $(date -u +'%Y-%m-%d %H:%M UTC')"
             git push
-          else
-            echo "state.json sin cambios"
           fi

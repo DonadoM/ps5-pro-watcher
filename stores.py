@@ -59,7 +59,7 @@ def _fetch_vtex(store_name: str, base_url: str, search_terms):
     seen_ids = set()
     for term in search_terms:
         url = f"{base_url}/api/catalog_system/pub/products/search"
-        params = {"ft": term, "_from": 0, "_to": 29}
+        params = {"ft": term, "_from": 0, "_to": 49}
         try:
             r = requests.get(url, params=params, headers=UA, timeout=20)
             r.raise_for_status()
