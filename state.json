@@ -7,14 +7,6 @@
     "in_stock": true,
     "_alerted_price": 4899900
   },
-  "Exito::3192604": {
-    "store": "Exito",
-    "title": "Consola Ps5 PRO 2 TB Blanco",
-    "price": 4797620,
-    "url": "https://www.exito.com/consola-ps5-pro-2-tb-blanco-3192604/p",
-    "in_stock": true,
-    "_alerted_price": 4798471
-  },
   "Exito::103972507": {
     "store": "Exito",
     "title": "Consola Playstation 5 Pro 2Tb Digital + 2 Mandos+ Cargador Dobe",
@@ -26,7 +18,7 @@
   "Exito::104366926": {
     "store": "Exito",
     "title": "Playstation 5 Pro 2Tb",
-    "price": 4798540,
+    "price": 4798494,
     "url": "https://www.exito.com/playstation-5-pro-2tb-104366926-mp/p",
     "in_stock": false,
     "_alerted_price": 4799000
@@ -54,6 +46,15 @@
     "url": "https://www.ktronix.com/consola-ps5-pro-digital-2-tb-blanco-1-control-inalambrico/p/711719595700",
     "in_stock": false,
     "_alerted_price": 4199900
+  },
+  "Exito::3192604": {
+    "store": "Exito",
+    "title": "Consola Ps5 PRO 2 TB Blanco",
+    "price": 4797620,
+    "url": "https://www.exito.com/consola-ps5-pro-2-tb-blanco-3192604/p",
+    "in_stock": true,
+    "_alerted_price": 4798471,
+    "_misses": 1
   },
   "Falabella::145535455": {
     "store": "Falabella",
