@@ -10,7 +10,7 @@
   "Exito::3192604": {
     "store": "Exito",
     "title": "Consola Ps5 PRO 2 TB Blanco",
-    "price": 4797413,
+    "price": 4797390,
     "url": "https://www.exito.com/consola-ps5-pro-2-tb-blanco-3192604/p",
     "in_stock": true,
     "_alerted_price": 4798471
@@ -26,7 +26,7 @@
   "Exito::104366926": {
     "store": "Exito",
     "title": "Playstation 5 Pro 2Tb",
-    "price": 4798333,
+    "price": 4798310,
     "url": "https://www.exito.com/playstation-5-pro-2tb-104366926-mp/p",
     "in_stock": false,
     "_alerted_price": 4799000
@@ -38,6 +38,13 @@
     "url": "https://www.falabella.com.co/falabella-co/product/156109421/consola-playstation-5-pro-digital-2tb-2-controles-dualsense-base-de-carga-dobe",
     "in_stock": true,
     "_alerted_price": 5599800
+  },
+  "Falabella::145535455": {
+    "store": "Falabella",
+    "title": "Consola Playstation 5 Pro Digital 2 TB",
+    "price": 4849900,
+    "url": "https://www.falabella.com.co/falabella-co/product/145535455/Consola-Playstation-5-Pro-Digital-2-TB",
+    "in_stock": true
   },
   "Alkosto::nco_1_control_inalambrico_p_711719595700": {
     "store": "Alkosto",
@@ -54,14 +61,6 @@
     "url": "https://www.ktronix.com/consola-ps5-pro-digital-2-tb-blanco-1-control-inalambrico/p/711719595700",
     "in_stock": false,
     "_alerted_price": 4199900
-  },
-  "Falabella::145535455": {
-    "store": "Falabella",
-    "title": "Consola Playstation 5 Pro Digital 2 TB",
-    "price": 4299900,
-    "url": "https://www.falabella.com.co/falabella-co/product/145535455/Consola-Playstation-5-Pro-Digital-2-TB",
-    "in_stock": true,
-    "_stale": true
   },
   "Falabella::139659096": {
     "store": "Falabella",
