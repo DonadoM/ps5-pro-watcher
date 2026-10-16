@@ -31,14 +31,6 @@
     "in_stock": false,
     "_alerted_price": 4799000
   },
-  "Falabella::156109421": {
-    "store": "Falabella",
-    "title": "Consola PlayStation 5 Pro Digital 2TB + 2 Controles DualSense+ Cargador Dobe",
-    "price": 5599800,
-    "url": "https://www.falabella.com.co/falabella-co/product/156109421/consola-playstation-5-pro-digital-2tb-2-controles-dualsense-base-de-carga-dobe",
-    "in_stock": true,
-    "_alerted_price": 5599800
-  },
   "Falabella::145535455": {
     "store": "Falabella",
     "title": "Consola Playstation 5 Pro Digital 2 TB",
@@ -46,6 +38,14 @@
     "url": "https://www.falabella.com.co/falabella-co/product/145535455/Consola-Playstation-5-Pro-Digital-2-TB",
     "in_stock": true,
     "_alerted_price": 4849900
+  },
+  "Falabella::156109421": {
+    "store": "Falabella",
+    "title": "Consola PlayStation 5 Pro Digital 2TB + 2 Controles DualSense+ Cargador Dobe",
+    "price": 5599800,
+    "url": "https://www.falabella.com.co/falabella-co/product/156109421/consola-playstation-5-pro-digital-2tb-2-controles-dualsense-base-de-carga-dobe",
+    "in_stock": true,
+    "_alerted_price": 5599800
   },
   "Alkosto::nco_1_control_inalambrico_p_711719595700": {
     "store": "Alkosto",
