@@ -10,7 +10,7 @@
   "Exito::3192604": {
     "store": "Exito",
     "title": "Consola Ps5 PRO 2 TB Blanco",
-    "price": 4797275,
+    "price": 4797229,
     "url": "https://www.exito.com/consola-ps5-pro-2-tb-blanco-3192604/p",
     "in_stock": true,
     "_alerted_price": 4798471
@@ -26,7 +26,7 @@
   "Exito::104366926": {
     "store": "Exito",
     "title": "Playstation 5 Pro 2Tb",
-    "price": 4798103,
+    "price": 4798057,
     "url": "https://www.exito.com/playstation-5-pro-2tb-104366926-mp/p",
     "in_stock": false,
     "_alerted_price": 4799000
@@ -36,7 +36,8 @@
     "title": "Consola Playstation 5 Pro Digital 2 TB",
     "price": 4749900,
     "url": "https://www.falabella.com.co/falabella-co/product/145535455/Consola-Playstation-5-Pro-Digital-2-TB",
-    "in_stock": true
+    "in_stock": true,
+    "_alerted_price": 4749900
   },
   "Falabella::156109421": {
     "store": "Falabella",
