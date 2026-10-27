@@ -2,15 +2,14 @@
   "Exito::3192604": {
     "store": "Exito",
     "title": "Consola Ps5 PRO 2 TB Blanco",
-    "price": 4791047,
+    "price": 4299899,
     "url": "https://www.exito.com/consola-ps5-pro-2-tb-blanco-3192604/p",
-    "in_stock": true,
-    "_alerted_price": 4796493
+    "in_stock": true
   },
   "Exito::103972507": {
     "store": "Exito",
     "title": "Consola Playstation 5 Pro 2Tb Digital + 2 Mandos+ Cargador Dobe",
-    "price": 5399800,
+    "price": 5399799,
     "url": "https://www.exito.com/consola-playstation-5-pro-2tb-digital-2-mandos-cargador-dobe-103972507-mp/p",
     "in_stock": true,
     "_alerted_price": 5399800
@@ -54,7 +53,7 @@
     "url": "https://www.exito.com/playstation-5-pro-2tb-104366926-mp/p",
     "in_stock": false,
     "_alerted_price": 5048975,
-    "_misses": 1
+    "_stale": true
   },
   "Exito::104569527": {
     "store": "Exito",
