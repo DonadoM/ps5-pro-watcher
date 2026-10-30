@@ -2,7 +2,7 @@
   "Exito::3192604": {
     "store": "Exito",
     "title": "Consola Ps5 PRO 2 TB Blanco",
-    "price": 4790603,
+    "price": 4790584,
     "url": "https://www.exito.com/consola-ps5-pro-2-tb-blanco-3192604/p",
     "in_stock": true,
     "_alerted_price": 4790761
@@ -36,7 +36,8 @@
     "title": "Consola Playstation 5 Pro 2Tb Digital + 2 Mandos+ Cargador Dobe",
     "price": 5399800,
     "url": "https://www.falabella.com.co/falabella-co/product/139040647/Consola-Playstation-5-Pro-2Tb-Digital-+-2-Mandos+-Cargador-Dobe",
-    "in_stock": true
+    "in_stock": true,
+    "_alerted_price": 5399800
   },
   "Alkosto::nco_1_control_inalambrico_p_711719595700": {
     "store": "Alkosto",
