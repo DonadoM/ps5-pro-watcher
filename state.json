@@ -1,8 +1,15 @@
 {
+  "Exito::104569527": {
+    "store": "Exito",
+    "title": "Consola Ps5 Pro Blanca",
+    "price": 5041000,
+    "url": "https://www.exito.com/consola-ps5-pro-blanca-104569527-mp/p",
+    "in_stock": true
+  },
   "Exito::3192604": {
     "store": "Exito",
     "title": "Consola Ps5 PRO 2 TB Blanco",
-    "price": 4789107,
+    "price": 4788914,
     "url": "https://www.exito.com/consola-ps5-pro-2-tb-blanco-3192604/p",
     "in_stock": true,
     "_alerted_price": 4790761
@@ -10,7 +17,7 @@
   "Exito::103972507": {
     "store": "Exito",
     "title": "Consola Playstation 5 Pro 2Tb Digital + 2 Mandos+ Cargador Dobe",
-    "price": 5399656,
+    "price": 5399655,
     "url": "https://www.exito.com/consola-playstation-5-pro-2tb-digital-2-mandos-cargador-dobe-103972507-mp/p",
     "in_stock": true,
     "_alerted_price": 5399800
@@ -18,7 +25,7 @@
   "Exito::104366926": {
     "store": "Exito",
     "title": "Playstation 5 Pro 2Tb",
-    "price": 5042170,
+    "price": 5042010,
     "url": "https://www.exito.com/playstation-5-pro-2tb-104366926-mp/p",
     "in_stock": true,
     "_alerted_price": 5042170
@@ -47,14 +54,6 @@
     "in_stock": true,
     "_alerted_price": 5399800
   },
-  "Ktronix::nco_1_control_inalambrico_p_711719595700": {
-    "store": "Ktronix",
-    "title": "Consola PS5 PRO Digital 2 TB Blanco + 1 Control",
-    "price": 4199900,
-    "url": "https://www.ktronix.com/consola-ps5-pro-digital-2-tb-blanco-1-control-inalambrico/p/711719595700",
-    "in_stock": false,
-    "_alerted_price": 4199900
-  },
   "Alkosto::nco_1_control_inalambrico_p_711719595700": {
     "store": "Alkosto",
     "title": "Consola PS5 PRO Digital 2 TB Blanco + 1 Control",
@@ -63,14 +62,13 @@
     "in_stock": false,
     "_alerted_price": 4199900
   },
-  "Exito::104569527": {
-    "store": "Exito",
-    "title": "Consola Ps5 Pro Blanca",
-    "price": 4899900,
-    "url": "https://www.exito.com/consola-ps5-pro-blanca-104569527-mp/p",
-    "in_stock": true,
-    "_alerted_price": 4899900,
-    "_stale": true
+  "Ktronix::nco_1_control_inalambrico_p_711719595700": {
+    "store": "Ktronix",
+    "title": "Consola PS5 PRO Digital 2 TB Blanco + 1 Control",
+    "price": 4199900,
+    "url": "https://www.ktronix.com/consola-ps5-pro-digital-2-tb-blanco-1-control-inalambrico/p/711719595700",
+    "in_stock": false,
+    "_alerted_price": 4199900
   },
   "Falabella::139659096": {
     "store": "Falabella",
